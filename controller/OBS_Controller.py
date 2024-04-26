@@ -22,6 +22,12 @@ def load_config_yaml(file_path):
         print(f"Error loading {file_path}: {e}")
         return None
     
+def record_toggle_callback(sender, app_data, user_data):
+    user_data.toggle_record()
+
+def pause_toggle_callback(sender, app_data, user_data):
+    user_data.toggle_record_pause()
+    
 try:
     cfg = load_config_yaml(parse_commandline_args())
 except Exception as e:
@@ -113,10 +119,10 @@ with dpg.window(tag="Primary Window"):
                 dpg.add_text(f"Error!", tag=f"fps_{conn}")
             with dpg.table_row():
                 dpg.add_text("Error!", tag=f"recording_status_{conn}")
-                dpg.add_button(label="Toggle Recording", tag=f"toggle_recording_{conn}", width=-1, callback=client.toggle_record)
+                dpg.add_button(label="Toggle Recording", tag=f"toggle_recording_{conn}", width=-1, callback=record_toggle_callback, user_data=client)
             with dpg.table_row():
                 dpg.add_text("Error!", tag=f"recording_pause_status_{conn}")
-                dpg.add_button(label="Pause/Resume", tag=f"toggle_recording_pause_{conn}", width=-1, callback=client.toggle_record_pause)
+                dpg.add_button(label="Pause/Resume", tag=f"toggle_recording_pause_{conn}", width=-1, callback=pause_toggle_callback, user_data=client)
             with dpg.table_row():
                 dpg.add_text("Recording Length:")
                 dpg.add_text(label="00:00:00", tag=f"time_{conn}")
