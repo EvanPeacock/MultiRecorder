@@ -1,0 +1,9 @@
+*.bmp
+*.py[cod]
+__pycache__
+*.log
+*.gz
+*.zip
+venv/
+OBS_Controller/
+/.vscode

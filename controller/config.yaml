@@ -1,4 +1,4 @@
-connections:
+obs_connections:
   - name: "Local OBS"
     host: "localhost"
     port: 4455
