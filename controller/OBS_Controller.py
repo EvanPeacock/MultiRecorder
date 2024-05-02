@@ -4,6 +4,13 @@ import obsws_python as obs
 import numpy as np
 from PIL import Image
 
+# GUI Constants
+RED = [255,0,0,255]
+YELLOW = [255,255,0,255]
+GREEN = [0,200,0,255]
+TABLE_HEADER_COLOR = (38,72,125)
+TABLE_HEIGHT = 100
+
 def parse_commandline_args():
     parser = argparse.ArgumentParser(description="OBS Controller")
     parser.add_argument('-c','--config-file',help='The path to a configuration file.', required=False, type=str, default=r"config.yaml")
@@ -70,8 +77,8 @@ except Exception as e:
 obs_connections = cfg['obs_connections']
 obs_active_clients = []
 obs_client_previews = []
-obs_active_conns = []
 conn_failed = False
+obs_active_conns = []
 failed_conns = []
 
 # Establish connections to OBS instances, track whether each connection was successful
@@ -86,12 +93,6 @@ for conn in obs_connections:
         print(f"Failed to connect to {conn['name']} at {conn['host']}:{conn['port']}")
         conn_failed = True
         pass
-
-RED = [255,0,0,255]
-YELLOW = [255,255,0,255]
-GREEN = [0,200,0,255]
-TABLE_HEADER_COLOR = (38,72,125)
-TABLE_HEIGHT = 100
 
 if len(obs_active_clients) == 0:
     app_width = 450
