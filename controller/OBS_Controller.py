@@ -1,7 +1,6 @@
 import argparse, base64, io, os, yaml
 import dearpygui.dearpygui as dpg
 import obsws_python as obs
-import numpy as np
 from PIL import Image
 
 # GUI Constants
@@ -33,26 +32,22 @@ def load_config_yaml(file_path):
     
 # Decode base64 string to array that can be used in dearpygui
 def decode_base64_to_image(base64_string):
-    # The OBS python library returns the image data as a base64 string
     # Decode base64 string into bytes
     image_bytes = base64.b64decode(base64_string)
 
     # Create PIL Image object from bytes
     image = Image.open(io.BytesIO(image_bytes))
 
-    # Convert PIL Image to numpy array
-    image_array = np.asarray(image, dtype=np.uint8)
+    # Convert PIL Image to list of tuples
+    image_list = list(image.getdata())
 
-    # Add alpha channel to image_array by inserting 255 every 4th element
-    alpha_image_array = np.insert(image_array, 3, 255, axis=2)
+    # Add alpha channel to image_list by appending 255 to each tuple
+    alpha_image_list = [(r, g, b, 255) for r, g, b in image_list]
 
-    # Reshape the image array into a 1D array
-    image_array_1d = alpha_image_array.reshape(-1, 4)
+    # Flatten the list and convert the values to floats in the range 0-1
+    image_list_1d = [float(i)/255 for sublist in alpha_image_list for i in sublist]
 
-    # Convert the array to floats and divide by 255 (0-1 range)
-    image_array_1d = [float(i)/255 for i in image_array_1d.flatten()]
-
-    return image_array_1d
+    return image_list_1d
 
 # Currently doesn't work
 def update_screenshot_callback(sender, app_data, user_data):

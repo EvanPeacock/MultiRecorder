@@ -1,5 +1,4 @@
 pyaml
 dearpygui
-numpy
 obsws_python
 pillow
