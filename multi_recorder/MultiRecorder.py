@@ -4,6 +4,7 @@ import obsws_python as obs
 from PIL import Image
 
 # GUI Constants
+WHITE = [255,255,255,255]
 RED = [255,0,0,255]
 YELLOW = [255,255,0,255]
 GREEN = [0,200,0,255]
@@ -86,7 +87,10 @@ def bm_record_toggle_callback(sender, app_data, user_data):
 # Start recording for all connections
 def record_all_callback(sender, app_data, user_data):
     for client in obs_active_clients:
-        client.start_record()
+        status = client.get_record_status()
+        is_recording = status.output_active
+        if not is_recording:
+            client.start_record()
     for conn in blackmagic_active_conns:
         recording = requests.get(url=f"http://{conn['host']}/control/api/v1/transports/0/record").json().get('recording')
         if not recording:
@@ -95,7 +99,10 @@ def record_all_callback(sender, app_data, user_data):
 # Stop recording for all connections
 def stop_all_callback(sender, app_data, user_data):
     for client in obs_active_clients:
-        client.stop_record()
+        status = client.get_record_status()
+        is_recording = status.output_active
+        if is_recording:
+            client.stop_record()
     for conn in blackmagic_active_conns:
         recording = requests.get(url=f"http://{conn['host']}/control/api/v1/transports/0/record").json().get('recording')
         if recording:
@@ -126,6 +133,11 @@ obs_active_conns = []
 if not obs_empty:
     for conn in obs_connections:
         try:
+            # Check if host and port are the same as a previous connection
+            if any(c['host'] == conn['host'] and c['port'] == conn['port'] for c in obs_active_conns):
+                print(f"Duplicate OBS connections in config @ {conn['host']}:{conn['port']}, only one connection will be established.")
+                continue
+            
             client = obs.ReqClient(host=conn['host'], port=conn['port'], timeout=1)
             obs_active_clients.append(client)
             obs_active_conns.append(conn)
@@ -149,6 +161,11 @@ blackmagic_active_conns = []
 if not blackmagic_empty:
     for conn in blackmagic_connections:
         try:
+            # Check if host is the same as a previous connection
+            if any(c['host'] == conn['host'] for c in blackmagic_active_conns):
+                print(f"Duplicate BlackMagic connections in config @ {conn['host']}, only one connection will be established.")
+                continue
+
             requests.put(url=f"http://{conn['host']}/control/api/v1/system/identify", json={'enabled': True})
             blackmagic_active_conns.append(conn)
             print(f"Successfully connected to {conn['name']} at {conn['host']}")
@@ -248,7 +265,7 @@ with dpg.window(tag="Primary Window"):
                                     dpg.add_button(label="Toggle Recording", tag=f"toggle_recording_{conn}", width=-1, callback=obs_record_toggle_callback, user_data=client)
                                 with dpg.table_row():
                                     dpg.add_text("Recording Length:")
-                                    dpg.add_text("00:00:00", tag=f"time_{conn}")
+                                    dpg.add_text("00:00:00.000", tag=f"time_{conn}")
                             if show_previews:
                                 aspect_ratio = client.get_video_settings().base_height / client.get_video_settings().base_width
                                 dpg.add_image(f"{conn}_preview", width=400, height=400 * aspect_ratio)
@@ -337,14 +354,16 @@ while dpg.is_dearpygui_running():
                     dpg.configure_item(f"recording_status_{conn}", color=RED)
                     dpg.set_value(f"recording_pause_status_{conn}", "Not Recording")
                     dpg.configure_item(f"recording_pause_status_{conn}", color=RED)
+
+                dpg.configure_item(f"fps_{conn}", color=WHITE)
+                dpg.configure_item(f"time_{conn}", color=WHITE)
             except Exception as e:
-                # print(f"Error with {conn['name']}, {e}")
                 dpg.set_value(f"fps_{conn}", "Error!")
                 dpg.configure_item(f"fps_{conn}", color=RED)
                 dpg.set_value(f"recording_status_{conn}", "Error!")
                 dpg.configure_item(f"recording_status_{conn}", color=RED)
-                # dpg.set_value(f"recording_pause_status_{conn}", "Error!")
-                # dpg.configure_item(f"recording_pause_status_{conn}", color=RED)
+                dpg.set_value(f"recording_pause_status_{conn}", "Error!")
+                dpg.configure_item(f"recording_pause_status_{conn}", color=RED)
                 dpg.set_value(f"time_{conn}", "Error!")
                 dpg.configure_item(f"time_{conn}", color=RED)
                 pass
@@ -362,6 +381,9 @@ while dpg.is_dearpygui_running():
                     dpg.configure_item(f"recording_status_{conn}", color=RED)
                     timecode = requests.get(url=f"http://{conn['host']}/control/api/v1/transports/0/timecode").json().get('timeline')
                 dpg.set_value(f"time_{conn}", timecode)
+
+                dpg.configure_item(f"fps_{conn}", color=WHITE)
+                dpg.configure_item(f"time_{conn}", color=WHITE)
             except Exception as e:
                 dpg.set_value(f"fps_{conn}", "Error!")
                 dpg.configure_item(f"fps_{conn}", color=RED)
