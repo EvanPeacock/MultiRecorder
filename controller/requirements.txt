@@ -1,4 +1,0 @@
-pyaml
-dearpygui
-obsws_python
-pillow

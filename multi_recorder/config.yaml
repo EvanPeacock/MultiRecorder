@@ -1,0 +1,10 @@
+obs_connections:
+  - name: "Local OBS"
+    host: "localhost"
+    port: 4455
+  # - name: "Some other connection"
+  #   host: "192.168.1.123"
+  #   port: 4455
+blackmagic_connections:
+  #  - name: "HyperDeck"
+  #    host: "192.168.1.456"
