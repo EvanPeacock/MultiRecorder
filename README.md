@@ -1,6 +1,6 @@
 # MultiRecorder
 
-A simple Python based utility for controlling and monitoring multiple OBS instances and BlackMagic HyperDeck products over a network connection.
+A simple Python-based utility for controlling and monitoring multiple OBS instances and BlackMagic HyperDeck products over a network connection.
 
 ![image](https://github.com/EvanPeacock/OBS-Controller/assets/36444106/3fb39038-09bb-447a-b76a-5cbd507edf50)
 
