@@ -11,19 +11,22 @@ GREEN = [0,200,0,255]
 TABLE_HEADER_COLOR = (38,72,125)
 TABLE_HEIGHT = 100
 
-# Timing Stuff
-FREQUENCY = 1/60
-timing_t0 = time.perf_counter()
-timing_counter = timing_t0
-
 # Command line args
-parser = argparse.ArgumentParser(description="OBS Controller")
+parser = argparse.ArgumentParser(prog="MultiRecorder")
 parser.add_argument('-c','--config-file',help='The path to a configuration file.', required=False, type=str, default=r"config.yaml")
 parser.add_argument('-p','--show-previews',help='Whether the OBS connections should show an initial screenshot preview.', 
-                    required=False, type=bool, default=False)
+                    required=False, default=False, action='store_true')
 parser.add_argument('-f','--show-fps',help='Whether the GUI should display frames per sseond in its title.', 
-                    required=False, type=bool, default=True)
+                    required=False, default=False, action='store_true')
+parser.add_argument('-fps','--target-framerate',help='A target maximum framerate for the GUI.', required=False, type=int, default=60)
+parser.add_argument('-t','--test-number-input',help='Whether the GUI should show the test number input.', 
+                    required=False, default=False, action='store_true')
 args = parser.parse_args()
+
+# Timing Stuff
+frame_frequency = 1/args.target_framerate
+timing_t0 = time.perf_counter()
+timing_counter = timing_t0
 
 if not os.path.exists(args.config_file):
     raise FileNotFoundError(f"Configuration file '{args.config_file}' not found. Make sure it exists and is spelled correctly.")
@@ -36,6 +39,8 @@ print(f"Show Previews: {show_previews}")
 show_fps = args.show_fps
 print(f"Show FPS: {show_fps}")
 
+test_number_input = args.test_number_input
+print(f"Test Number Input: {test_number_input}")
 
 def load_config_yaml(file_path):
     try:
@@ -108,6 +113,44 @@ def stop_all_callback(sender, app_data, user_data):
         if recording:
             requests.put(url=f"http://{conn['host']}/control/api/v1/transports/0/record", json={'recording': False})
 
+# Set the directory for recordings
+def set_test_directory_callback(sender, app_data, user_data):
+    success = True
+     # Add leading zeros if test_number is less than 4 digits, account for 'g' suffix
+    test_number = dpg.get_value("test_number")
+    if "g" in test_number:
+        test_number = str(test_number).zfill(5)
+    else:
+        test_number = str(test_number).zfill(4)
+
+    # Check if test_number is valid, make sure it's 4 digits with an optional 'g' suffix
+    if not (test_number.isdigit() and len(test_number) == 4) and not (test_number[:-1].isdigit() and 
+    len(test_number) == 5 and test_number[-1].lower() == 'g'):
+        dpg.set_value("test_number", "")
+        dpg.configure_item("test_number", hint=f"Invalid test number!")
+        return
+    
+    # Create directory for each OBS connection
+    for client in obs_active_clients:
+        conn = obs_active_conns[obs_active_clients.index(client)]
+        directory_path = f"Z:\\test_{test_number}\\video\\{conn['name']}"
+        try:
+            if not os.path.exists(directory_path):
+                os.makedirs(directory_path)
+        except Exception as e:
+            print(f"Failed to create directory: {e}")
+            success = False
+        client.set_record_directory(directory_path)
+
+    # Set directory for each BlackMagic connection - Not yet sure if this is possible with our current setup
+    # for conn in blackmagic_active_conns:
+    #     requests.put(url=f"http://{conn['host']}/control/api/v1/transports/0/clip", json={'clip': {'name': test_number}})
+
+    # Confirm directory was set
+    if success:
+        dpg.set_value("test_number", "")
+        dpg.configure_item("test_number", hint=f"Test Number: {test_number}")
+
 # Load config file
 try:
     cfg = load_config_yaml(args.config_file)
@@ -141,12 +184,16 @@ if not obs_empty:
             client = obs.ReqClient(host=conn['host'], port=conn['port'], timeout=1)
             obs_active_clients.append(client)
             obs_active_conns.append(conn)
-            print(f"Successfully connected to {conn['name']} at {conn['host']}:{conn['port']}")
+            print(f"Successfully connected to {conn['name']} @ {conn['host']}:{conn['port']}")
         except Exception as e:
             failed_conns.append(conn)
-            print(f"Failed to connect to {conn['name']} at {conn['host']}:{conn['port']}")
+            print(f"Failed to connect to {conn['name']} @ {conn['host']}:{conn['port']}")
             conn_failed = True
             pass
+
+    if obs_active_clients is None or len(obs_active_clients) == 0:
+        print("All OBS connections failed.")
+        obs_empty = True
 
 # Establish connection to BlackMagic devices, track whether each connection was successful
 blackmagic_connections = cfg['blackmagic_connections']
@@ -166,7 +213,7 @@ if not blackmagic_empty:
                 print(f"Duplicate BlackMagic connections in config @ {conn['host']}, only one connection will be established.")
                 continue
 
-            requests.put(url=f"http://{conn['host']}/control/api/v1/system/identify", json={'enabled': True})
+            requests.get(url=f"http://{conn['host']}/control/api/v1/transports/0/record").json().get('recording')
             blackmagic_active_conns.append(conn)
             print(f"Successfully connected to {conn['name']} at {conn['host']}")
         except Exception as e:
@@ -176,23 +223,38 @@ if not blackmagic_empty:
             conn_failed = True
             pass
 
+    if blackmagic_active_conns is None or len(blackmagic_active_conns) == 0:
+        print("All BlackMagic connections failed.")
+        blackmagic_empty = True
+
+# Count the number of active connections and the number of connections currently recording
+num_active_conns = len(obs_active_clients) + len(blackmagic_active_conns)
+num_recording_conns = 0
+for client in obs_active_clients:
+    if client.get_record_status().output_active:
+        num_recording_conns += 1
+for conn in blackmagic_active_conns:
+    if requests.get(url=f"http://{conn['host']}/control/api/v1/transports/0/record").json().get('recording'):
+        num_recording_conns += 1
+
 # Set up the GUI
 if len(obs_active_clients) > len(blackmagic_active_conns):
     greatest_conns = len(obs_active_clients)
 else:
     greatest_conns = len(blackmagic_active_conns)
 
-if len(obs_active_clients) == 0 and len(blackmagic_active_conns) == 0:
+if obs_empty and blackmagic_empty:
     app_width  = 500
     app_height = 500
 else:
     if show_previews:
         app_width = (greatest_conns * 430) - ((greatest_conns-1) * 20)
-        app_height = 415
+        app_height = 480
     else:
         app_width = 430
-        app_height = int(greatest_conns * 2 * TABLE_HEIGHT) - ((greatest_conns-1) * 100)
-fail_modal_height = app_height - 150
+        app_height = int(greatest_conns * TABLE_HEIGHT) + ((greatest_conns-1) * 8) + 150
+fail_modal_height = app_height - 80
+fail_modal_width = app_width - 80
 
 dpg.create_context()
 with dpg.font_registry():
@@ -224,7 +286,8 @@ with dpg.window(tag="Primary Window"):
     dpg.bind_font(default_font)
 
     # Notify user which connections failed, if any
-    with dpg.window(label="Connections Failed", modal=True, show=conn_failed, tag="connection_fail", width=app_width-100, height=fail_modal_height, pos=(50,50)):
+    with dpg.window(label="Connections Failed", modal=True, show=conn_failed, tag="connection_fail",
+                     width=fail_modal_width, height=fail_modal_height, pos=(30,20)):
         dpg.add_text("The following failed to connect:")
         for conn in failed_conns:
             if not obs_empty and conn in obs_connections:
@@ -234,9 +297,9 @@ with dpg.window(tag="Primary Window"):
         dpg.add_text("Make sure the config file is correct.")
         dpg.add_text("OBS: Make sure WebSocket is configured.")
         dpg.add_text("BlackMagic: Make sure remote is enabled.")
-        dpg.add_spacer(height=50)
-        dpg.add_button(label="Close", width=-1, height=50, callback=lambda: dpg.configure_item("connection_fail", show=False))
-
+        dpg.add_text("BlackMagic: Check input is working.")
+        # dpg.add_button(label="Close", width=-1, height=50, callback=lambda: dpg.configure_item("connection_fail", show=False))
+    
     with dpg.tab_bar(tag="tab_bar", reorderable=True):
 
         if not obs_empty:
@@ -284,7 +347,7 @@ with dpg.window(tag="Primary Window"):
                             dpg.add_text(f"{clip.get('clip').get('videoFormat').get('width')}x{clip.get('clip').get('videoFormat').get('height')}")
                             dpg.add_text(f"{clip.get('clip').get('videoFormat').get('frameRate')}.0 FPS")
                         with dpg.table_row():
-                            input_source = requests.get(f"http://{conn['host']}/control/api/v1/transports/0/inputVideoSource").json()
+                            input_source = requests.get(url=f"http://{conn['host']}/control/api/v1/transports/0/inputVideoSource").json()
                             dpg.add_text(f"{input_source.get('inputVideoSource')}", tag=f"input_source_{conn}")
                             dpg.add_text(clip.get('clip').get('codecFormat').get('codec'), tag=f"codec_{conn}")
                         with dpg.table_row():
@@ -301,12 +364,30 @@ with dpg.window(tag="Primary Window"):
             dpg.add_tab_button(label="                      ", tag="tab_spacer")
         elif obs_empty and not blackmagic_empty:
             dpg.add_tab_button(label="               ", tag="tab_spacer")
+        else:
+            dpg.add_tab_button(label="", tag="tab_spacer")
         dpg.bind_item_theme("tab_spacer", tab_spacer)
         dpg.add_tab_button(label="Record All", trailing=True, callback=record_all_callback)
         dpg.add_tab_button(label="Stop All",   trailing=True, callback=stop_all_callback)
 
+    with dpg.tree_node(label="Status & Settings", default_open=True):
+        if num_active_conns == 1:
+            dpg.add_text(f"{num_active_conns} connection, {num_recording_conns} recording", tag="connection_status", show=not conn_failed)
+        else:
+            dpg.add_text(f"{num_active_conns} connections, {num_recording_conns} recording", tag="connection_status", show=not conn_failed)
+
+        dpg.add_slider_int(label="Target Framerate", width=240, default_value=args.target_framerate, min_value=10, max_value=60, tag="target_framerate")
+
+        if test_number_input:
+            with dpg.table(header_row=False, resizable=False, width=-1, height=10, borders_innerH=False, borders_outerH=False, borders_innerV=False, borders_outerV=False):
+                dpg.add_table_column()
+                dpg.add_table_column()
+                with dpg.table_row():
+                    dpg.add_input_text(hint="Test Number", width=-1, tag="test_number")
+                    dpg.add_button(label="Enter", width=-1, callback=set_test_directory_callback)
+
 dpg.setup_dearpygui()
-dpg.create_viewport(title="Starting up...",
+dpg.create_viewport(title="MultiRecorder",
     width=app_width,
     height=app_height,
     vsync=False,
@@ -322,12 +403,9 @@ dpg.show_viewport()
 # dpg.show_style_editor()
 dpg.set_primary_window("Primary Window", True)
 
-num_active_conns = len(obs_active_clients) + len(blackmagic_active_conns)
 while dpg.is_dearpygui_running():
     if show_fps:
-        dpg.set_viewport_title(title=f"MultiRecorder - 1 Connection - {dpg.get_frame_rate()} fps" if num_active_conns == 1 else f"MultiRecorder - {num_active_conns} Connections - {dpg.get_frame_rate()} fps")
-    else:
-        dpg.set_viewport_title(title=f"MultiRecorder - 1 Connection" if num_active_conns == 1 else f"MultiRecorder - {num_active_conns} Connections")
+        dpg.set_viewport_title(title=f"MultiRecorder - {dpg.get_frame_rate()} fps")
 
     if not obs_empty:
         for client in obs_active_clients:
@@ -358,12 +436,6 @@ while dpg.is_dearpygui_running():
                 dpg.configure_item(f"fps_{conn}", color=WHITE)
                 dpg.configure_item(f"time_{conn}", color=WHITE)
             except Exception as e:
-                dpg.set_value(f"fps_{conn}", "Error!")
-                dpg.configure_item(f"fps_{conn}", color=RED)
-                dpg.set_value(f"recording_status_{conn}", "Error!")
-                dpg.configure_item(f"recording_status_{conn}", color=RED)
-                dpg.set_value(f"recording_pause_status_{conn}", "Error!")
-                dpg.configure_item(f"recording_pause_status_{conn}", color=RED)
                 dpg.set_value(f"time_{conn}", "Error!")
                 dpg.configure_item(f"time_{conn}", color=RED)
                 pass
@@ -382,26 +454,39 @@ while dpg.is_dearpygui_running():
                     timecode = requests.get(url=f"http://{conn['host']}/control/api/v1/transports/0/timecode").json().get('timeline')
                 dpg.set_value(f"time_{conn}", timecode)
 
-                dpg.configure_item(f"fps_{conn}", color=WHITE)
                 dpg.configure_item(f"time_{conn}", color=WHITE)
             except Exception as e:
-                dpg.set_value(f"fps_{conn}", "Error!")
-                dpg.configure_item(f"fps_{conn}", color=RED)
-                dpg.set_value(f"recording_status_{conn}", "Error!")
-                dpg.configure_item(f"recording_status_{conn}", color=RED)
-                dpg.set_value(f"recording_pause_status_{conn}", "Error!")
-                dpg.configure_item(f"recording_pause_status_{conn}", color=RED)
                 dpg.set_value(f"time_{conn}", "Error!")
                 dpg.configure_item(f"time_{conn}", color=RED)
                 pass
 
-    # Cap at 60fps
+    # Update number of connections currently recording
+    try:
+        new_num_recording_conns = 0
+        for client in obs_active_clients:
+            if client.get_record_status().output_active:
+                new_num_recording_conns += 1
+        for conn in blackmagic_active_conns:
+            if requests.get(url=f"http://{conn['host']}/control/api/v1/transports/0/record").json().get('recording'):
+                new_num_recording_conns += 1
+        if new_num_recording_conns != num_recording_conns:
+            num_recording_conns = new_num_recording_conns
+            if num_active_conns == 1:
+                dpg.set_value("connection_status", f"{num_active_conns} connection, {num_recording_conns} recording")
+            else:
+                dpg.set_value("connection_status", f"{num_active_conns} connections, {num_recording_conns} recording")
+    except Exception as e:
+        print(f"Failed to update recording count: {e}")
+        pass
+
+    # Cap at target fps
+    frame_frequency = 1/dpg.get_value("target_framerate")
     now = time.perf_counter()
     elapsed_time = now - timing_counter
-    if elapsed_time < FREQUENCY:
-        target_time =  FREQUENCY - elapsed_time
+    if elapsed_time < frame_frequency:
+        target_time =  frame_frequency - elapsed_time
         time.sleep(target_time)
-    timing_counter += FREQUENCY
+    timing_counter += frame_frequency
 
     dpg.render_dearpygui_frame()
 
