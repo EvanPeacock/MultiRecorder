@@ -19,7 +19,7 @@ parser.add_argument('-p','--show-previews',help='Whether the OBS connections sho
 parser.add_argument('-f','--show-fps',help='Whether the GUI should display frames per sseond in its title.', 
                     required=False, default=False, action='store_true')
 parser.add_argument('-fps','--target-framerate',help='A target maximum framerate for the GUI.', required=False, type=int, default=60)
-parser.add_argument('-t','--test-number-input',help='Whether the GUI should show the test number input.', 
+parser.add_argument('-d','--record-directory',help='Whether the GUI should show the record directory input.', 
                     required=False, default=False, action='store_true')
 args = parser.parse_args()
 
@@ -39,8 +39,8 @@ print(f"Show Previews: {show_previews}")
 show_fps = args.show_fps
 print(f"Show FPS: {show_fps}")
 
-test_number_input = args.test_number_input
-print(f"Test Number Input: {test_number_input}")
+record_directory = args.record_directory
+print(f"Test Number Input: {record_directory}")
 
 def load_config_yaml(file_path):
     try:
@@ -116,24 +116,12 @@ def stop_all_callback(sender, app_data, user_data):
 # Set the directory for recordings
 def set_test_directory_callback(sender, app_data, user_data):
     success = True
-     # Add leading zeros if test_number is less than 4 digits, account for 'g' suffix
-    test_number = dpg.get_value("test_number")
-    if "g" in test_number:
-        test_number = str(test_number).zfill(5)
-    else:
-        test_number = str(test_number).zfill(4)
-
-    # Check if test_number is valid, make sure it's 4 digits with an optional 'g' suffix
-    if not (test_number.isdigit() and len(test_number) == 4) and not (test_number[:-1].isdigit() and 
-    len(test_number) == 5 and test_number[-1].lower() == 'g'):
-        dpg.set_value("test_number", "")
-        dpg.configure_item("test_number", hint=f"Invalid test number!")
-        return
+    record_dir = dpg.get_value("record_dir")
     
     # Create directory for each OBS connection
     for client in obs_active_clients:
         conn = obs_active_conns[obs_active_clients.index(client)]
-        directory_path = f"Z:\\test_{test_number}\\video\\{conn['name']}"
+        directory_path = f"{record_dir}\\video\\{conn['name']}"
         try:
             if not os.path.exists(directory_path):
                 os.makedirs(directory_path)
@@ -142,14 +130,14 @@ def set_test_directory_callback(sender, app_data, user_data):
             success = False
         client.set_record_directory(directory_path)
 
-    # Set directory for each BlackMagic connection - Not yet sure if this is possible with our current setup
+    # Set directory for each BlackMagic connection - Not yet sure if this is possible with current setup
     # for conn in blackmagic_active_conns:
-    #     requests.put(url=f"http://{conn['host']}/control/api/v1/transports/0/clip", json={'clip': {'name': test_number}})
+    #     requests.put(url=f"http://{conn['host']}/control/api/v1/transports/0/clip", json={'clip': {'name': record_dir}})
 
     # Confirm directory was set
     if success:
-        dpg.set_value("test_number", "")
-        dpg.configure_item("test_number", hint=f"Test Number: {test_number}")
+        dpg.set_value("record_dir", "")
+        dpg.configure_item("record_dir", hint=f"{record_dir}")
 
 # Load config file
 try:
@@ -376,14 +364,14 @@ with dpg.window(tag="Primary Window"):
         else:
             dpg.add_text(f"{num_active_conns} connections, {num_recording_conns} recording", tag="connection_status", show=not conn_failed)
 
-        dpg.add_slider_int(label="Target Framerate", width=240, default_value=args.target_framerate, min_value=10, max_value=60, tag="target_framerate")
+        dpg.add_slider_int(label="GUI Target Framerate", width=196, default_value=args.target_framerate, min_value=10, max_value=60, tag="target_framerate")
 
-        if test_number_input:
+        if record_directory:
             with dpg.table(header_row=False, resizable=False, width=-1, height=10, borders_innerH=False, borders_outerH=False, borders_innerV=False, borders_outerV=False):
                 dpg.add_table_column()
                 dpg.add_table_column()
                 with dpg.table_row():
-                    dpg.add_input_text(hint="Test Number", width=-1, tag="test_number")
+                    dpg.add_input_text(hint="Record Directory", width=-1, tag="record_dir")
                     dpg.add_button(label="Enter", width=-1, callback=set_test_directory_callback)
 
 dpg.setup_dearpygui()
