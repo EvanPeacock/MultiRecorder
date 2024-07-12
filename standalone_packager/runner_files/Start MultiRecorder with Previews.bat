@@ -10,7 +10,7 @@ echo.
 echo.
 
 cd multi_recorder
-MultiRecorder.exe --config-file "%CONFIG_FILE%" -p True
+MultiRecorder.exe --config-file "%CONFIG_FILE%" -f -p 
 
 :end
 timeout /t 30
