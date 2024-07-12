@@ -40,7 +40,7 @@ show_fps = args.show_fps
 print(f"Show FPS: {show_fps}")
 
 record_directory = args.record_directory
-print(f"Test Number Input: {record_directory}")
+print(f"Record Directory: {record_directory}")
 
 def load_config_yaml(file_path):
     try:
@@ -114,7 +114,7 @@ def stop_all_callback(sender, app_data, user_data):
             requests.put(url=f"http://{conn['host']}/control/api/v1/transports/0/record", json={'recording': False})
 
 # Set the directory for recordings
-def set_test_directory_callback(sender, app_data, user_data):
+def set_record_directory_callback(sender, app_data, user_data):
     success = True
     record_dir = dpg.get_value("record_dir")
     
@@ -372,7 +372,7 @@ with dpg.window(tag="Primary Window"):
                 dpg.add_table_column()
                 with dpg.table_row():
                     dpg.add_input_text(hint="Record Directory", width=-1, tag="record_dir")
-                    dpg.add_button(label="Enter", width=-1, callback=set_test_directory_callback)
+                    dpg.add_button(label="Enter", width=-1, callback=set_record_directory_callback)
 
 dpg.setup_dearpygui()
 dpg.create_viewport(title="MultiRecorder",
