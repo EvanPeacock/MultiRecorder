@@ -63,8 +63,7 @@ pip freeze
 
 timeout /t 10
 
-::For some reason, this doesn't work correctly with Nuitka 2.4+
-pip install nuitka==2.3.11 ordered-set
+pip install nuitka  ordered-set
 
 :: DONT FORGET THE ENDING QUOTE 
 set "ARGS=--standalone  --follow-imports   --no-deployment-flag=self-execution"

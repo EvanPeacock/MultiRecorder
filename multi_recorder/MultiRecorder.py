@@ -332,32 +332,12 @@ with dpg.window(tag="Primary Window"):
                         dpg.add_table_column(label=conn['host'])
                         with dpg.table_row():
                             clip = requests.get(url=f"http://{conn['host']}/control/api/v1/transports/0/clip").json()
-                            try:
-                                dpg.add_text(f"{clip.get('clip').get('videoFormat').get('width')}x{clip.get('clip').get('videoFormat').get('height')}") 
-                            except Exception as e:
-                                dpg.add_text("Error!")
-                                print(f"Failed to get {conn['name']} resolution: {e}")
-
-                            try:
-                                dpg.add_text(f"{clip.get('clip').get('videoFormat').get('frameRate')}.0 FPS") 
-                            except Exception as e:
-                                dpg.add_text("Error!")
-                                print(f"Failed to get {conn['name']} framerate: {e}")
-
+                            dpg.add_text(f"{clip.get('clip').get('videoFormat').get('width')}x{clip.get('clip').get('videoFormat').get('height')}")
+                            dpg.add_text(f"{clip.get('clip').get('videoFormat').get('frameRate')}.0 FPS")
                         with dpg.table_row():
                             input_source = requests.get(url=f"http://{conn['host']}/control/api/v1/transports/0/inputVideoSource").json()
-                            try:
-                                dpg.add_text(f"{input_source.get('inputVideoSource')}", tag=f"input_source_{conn}") 
-                            except Exception as e:
-                                dpg.add_text("Error!", tag=f"input_source_{conn}")
-                                print(f"Failed to get {conn['name']} input source: {e}")
-
-                            try:
-                                dpg.add_text(clip.get('clip').get('codecFormat').get('codec'), tag=f"codec_{conn}") 
-                            except Exception as e:
-                                dpg.add_text("Error!", tag=f"codec_{conn}")
-                                print(f"Failed to get {conn['name']} codec: {e}")
-
+                            dpg.add_text(f"{input_source.get('inputVideoSource')}", tag=f"input_source_{conn}")
+                            dpg.add_text(clip.get('clip').get('codecFormat').get('codec'), tag=f"codec_{conn}")
                         with dpg.table_row():
                             dpg.add_text("Error!", tag=f"recording_status_{conn}")
                             dpg.add_button(label="Toggle Recording", tag=f"toggle_recording_{conn}", width=-1,
@@ -384,7 +364,7 @@ with dpg.window(tag="Primary Window"):
         else:
             dpg.add_text(f"{num_active_conns} connections, {num_recording_conns} recording", tag="connection_status", show=not conn_failed)
 
-        dpg.add_slider_int(label="MultiRecorder GUI Framerate", width=196, default_value=args.target_framerate, min_value=10, max_value=60, tag="target_framerate")
+        dpg.add_slider_int(label="GUI Target Framerate", width=196, default_value=args.target_framerate, min_value=10, max_value=60, tag="target_framerate")
 
         if record_directory:
             with dpg.table(header_row=False, resizable=False, width=-1, height=10, borders_innerH=False, borders_outerH=False, borders_innerV=False, borders_outerV=False):

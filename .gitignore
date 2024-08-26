@@ -5,6 +5,5 @@ __pycache__
 *.gz
 *.zip
 venv/
-OBS_Controller/
 /.vscode
-multi_recorder/internal
+internal/
