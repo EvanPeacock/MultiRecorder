@@ -332,12 +332,36 @@ with dpg.window(tag="Primary Window"):
                         dpg.add_table_column(label=conn['host'])
                         with dpg.table_row():
                             clip = requests.get(url=f"http://{conn['host']}/control/api/v1/transports/0/clip").json()
-                            dpg.add_text(f"{clip.get('clip').get('videoFormat').get('width')}x{clip.get('clip').get('videoFormat').get('height')}")
-                            dpg.add_text(f"{clip.get('clip').get('videoFormat').get('frameRate')}.0 FPS")
+                            try:
+                                dpg.add_text(f"{clip.get('clip').get('videoFormat').get('width')}x{clip.get('clip').get('videoFormat').get('height')}")
+                            except Exception as e:
+                                dpg.add_text("Error!")
+                                print(f"Failed to get {conn['name']} resolution: {e}")
+                                print(f"This is likely because the BlackMagic device isn't receiving any input.")
+
+                            try:
+                                dpg.add_text(f"{clip.get('clip').get('videoFormat').get('frameRate')}.0 FPS")
+                            except Exception as e:
+                                dpg.add_text("Error!")
+                                print(f"Failed to get {conn['name']} framerate: {e}")
+                                print(f"This is likely because the BlackMagic device isn't receiving any input.")
+
                         with dpg.table_row():
                             input_source = requests.get(url=f"http://{conn['host']}/control/api/v1/transports/0/inputVideoSource").json()
-                            dpg.add_text(f"{input_source.get('inputVideoSource')}", tag=f"input_source_{conn}")
-                            dpg.add_text(clip.get('clip').get('codecFormat').get('codec'), tag=f"codec_{conn}")
+                            try:
+                                dpg.add_text(f"{input_source.get('inputVideoSource')}", tag=f"input_source_{conn}")
+                            except Exception as e:
+                                dpg.add_text("Error!")
+                                print(f"Failed to get {conn['name']} input source: {e}")
+                                print(f"This is likely because the BlackMagic device isn't receiving any input.")
+
+                            try:
+                                dpg.add_text(clip.get('clip').get('codecFormat').get('codec'), tag=f"codec_{conn}")
+                            except Exception as e:
+                                dpg.add_text("Error!")
+                                print(f"Failed to get {conn['name']} codec: {e}")
+                                print(f"This is likely because the BlackMagic device isn't receiving any input.")
+                                
                         with dpg.table_row():
                             dpg.add_text("Error!", tag=f"recording_status_{conn}")
                             dpg.add_button(label="Toggle Recording", tag=f"toggle_recording_{conn}", width=-1,
