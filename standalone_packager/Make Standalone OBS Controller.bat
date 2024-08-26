@@ -23,8 +23,8 @@ popd
 
 :: ===== Set up names here =====
 set VENVDIR=venv
-set PKGSRC=controller
-set PYNAME=OBS_Controller
+set PKGSRC=multi_recorder
+set PYNAME=MultiRecorder
 set PYCMD="%PYNAME%.py"
 ::set PYVER=0.9.12dev
 ::set /p PYVER=<%PKGSRC%\_version.py
@@ -33,7 +33,6 @@ set PYCMD="%PYNAME%.py"
 ::)
 
 :: =============================
-
 
 :: *UNSET* PYTHONPATH --> THIS IS IMPORTANT TO DO FOR VIRTUALENV!
 set PYTHONPATH=
@@ -64,10 +63,9 @@ pip freeze
 
 timeout /t 10
 
-pip install nuitka  ordered-set
+::For some reason, this doesn't work correctly with Nuitka 2.4+
+pip install nuitka==2.3.11 ordered-set
 
-::python -m nuitka --standalone --onefile "%PYCMD%"   
-:: NOTE: nuitka ignores gcs_pfd/ADAHRS_HSI.dll & gcs_nav/NavDisplay.dll  for some reason unless you specify it directly
 :: DONT FORGET THE ENDING QUOTE 
 set "ARGS=--standalone  --follow-imports   --no-deployment-flag=self-execution"
 set "ARGS=%ARGS%  --show-progress --show-modules"
@@ -76,14 +74,15 @@ set "ARGS=%ARGS% --include-data-files=config.yaml=."
 set "ARGS=%ARGS% --include-data-dir="assets"=assets"
 set "ARGS=%ARGS% --noinclude-numba-mode=nofollow"
 set "ARGS=%ARGS% --noinclude-setuptools-mode=nofollow"
+set "ARGS=%ARGS% --windows-icon-from-ico=assets/icon.ico"
 python -m nuitka %ARGS% "%PYCMD%"   
 
 :: ===== Package up the program in a friendly way =====
 :: include manual and runner batch files
 rmdir /S /Q tempzip
 mkdir tempzip
-robocopy %PYNAME%.dist tempzip/controller /E
-robocopy %BASEPKGDIR%/standalone_packager/runner_files tempzip "Start OBS Controller Standalone.bat"
+robocopy %PYNAME%.dist tempzip/%PKGSRC% /E
+robocopy %BASEPKGDIR%/standalone_packager/runner_files tempzip "Start MultiRecorder.bat" "Start MultiRecorder with Previews.bat"
 
 python -c "import shutil,os;shutil.make_archive('%PYNAME%',format='zip',root_dir='tempzip')
 
